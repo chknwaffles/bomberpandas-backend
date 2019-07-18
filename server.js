@@ -12,31 +12,43 @@ wss.on('connection', (ws) => {
     console.log('Connected!')
 
     ws.on('message', (data) => {
-        console.log('incoming data', data)
-        console.log('testing data', data.type)
-        console.log('testing data2', data.x)
+        let dataObj = JSON.parse(data)
 
-        wss.clients.forEach(client => {
-            if (client.readyState === WebSocket.OPEN) {
-                client.send(data)
-                console.log('sending data', data)
-            }
-        })
-        switch(data.type) {
-            case 'Bomb': {
-                // startBombTimer()
+        switch(dataObj.type) {
+            case 'bomb': {
+                // send targets to explode
+                // 
+                let targetRow = (dataObj.x / 50)
+                let targetCol = (dataObj.y / 50)
+                let targets = [
+                    'BOMB TARGETS',
+                    { x: targetRow - 1, y: targetCol },
+                    { x: targetRow, y: targetCol - 1 },
+                    { x: targetRow, y: targetCol },
+                    { x: targetRow, y: targetCol + 1 },
+                    { x: targetRow + 1, y: targetCol },
+                ]
+
+                bombTimer = () => {
+                    setTimeout(() => {
+                        wss.clients.forEach(client => {
+                            if (client.readyState === WebSocket.OPEN) {
+                                client.send(JSON.stringify(targets))
+                                console.log('sending data', targets)
+                                clearTimeout(bombTimer)
+                            }
+                        })
+                    }, 5000)
+                }
+
                 
-                // setTimeout(() => {
-                //     wss.clients.forEach(client => {
-                //         if (client.readyState === WebSocket.OPEN) {
-                //             client.send(data)
-                //             console.log(data)
-                //         }
-                //     })
-                // }, 3000)
-                break;
+        
+                bombTimer() 
+                break
+            }
+            default: {
+                console.log('message', dataObj)
             }
         }
-        
     })
 })

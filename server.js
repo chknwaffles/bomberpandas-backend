@@ -1,8 +1,9 @@
 const app = require('express')()
 const server = require('http').createServer(app)
 const WebSocket = require('ws')
-const PORT = 3000
 const cors = require('cors')
+const mongoose = require('mongoose')
+const PORT = process.env.PORT || 3000
 
 app.use(cors())
 
@@ -15,18 +16,17 @@ wss.on('connection', (ws) => {
         let dataObj = JSON.parse(data)
 
         switch(dataObj.type) {
-            case 'bomb': {
+            case 'B': {
                 // send targets to explode
-                // 
-                let targetRow = (dataObj.x / 50)
-                let targetCol = (dataObj.y / 50)
+                let targetRow = (dataObj.x)
+                let targetCol = (dataObj.y)
                 let targets = [
                     'BOMB TARGETS',
                     { x: targetRow - 1, y: targetCol },
                     { x: targetRow, y: targetCol - 1 },
                     { x: targetRow, y: targetCol },
-                    { x: targetRow, y: targetCol + 1 },
                     { x: targetRow + 1, y: targetCol },
+                    { x: targetRow, y: targetCol + 1 },
                 ]
 
                 bombTimer = () => {
@@ -41,8 +41,6 @@ wss.on('connection', (ws) => {
                     }, 5000)
                 }
 
-                
-        
                 bombTimer() 
                 break
             }

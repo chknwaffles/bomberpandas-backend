@@ -38,7 +38,7 @@ wss.on('connection', (ws) => {
                                 clearTimeout(bombTimer)
                             }
                         })
-                    }, 5000)
+                    }, 4000)
                 }
 
                 bombTimer() 

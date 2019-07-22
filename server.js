@@ -3,9 +3,19 @@ const server = require('http').createServer(app)
 const WebSocket = require('ws')
 const cors = require('cors')
 const mongoose = require('mongoose')
+const User = require('./models/User')
+const Game = require('./models/Game')
+const bodyParser = require("body-parser")
 const PORT = process.env.PORT || 3000
 
 app.use(cors())
+app.use(bodyParser.urlencoded({ extended: false }))
+app.use(bodyParser.json())
+
+mongoose.connect('mongodb://localhost/bomberman', { useNewUrlParser: true})
+.then(() => console.log('MongoDB connected!'))
+mongoose.set('useCreateIndex', true)
+mongoose.Promise = global.Promise
 
 const wss = new WebSocket.Server({ port: PORT })
 
@@ -44,9 +54,18 @@ wss.on('connection', (ws) => {
                 bombTimer() 
                 break
             }
+            case 'message': {
+                wss.clients.forEach(client => {
+                    if (client !== ws && client.readyState === WebSocket.OPEN) {
+                        client.send(JSON.stringify(data))
+                        console.log('sending message back', data)
+                    }
+                })
+            }
             default: {
                 console.log('message', dataObj)
             }
         }
     })
 })
+

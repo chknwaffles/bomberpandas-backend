@@ -1,15 +1,27 @@
+'use strict'
 const mongoose = require('mongoose')
-const schema = mongoose.schema
+const bcrypt = require('bcrypt')
+const Schema = mongoose.Schema
 
-const userSchema = new Schema({
+const UserSchema = new Schema({
     username: {
         type: String,
         unique: true,
     },
-    password: String,
-    scores: []
+    password: {
+        type: String,
+        required: true,
+    },
+    posX: Number,
+    posY: Number,
+    placedBomb: Boolean,
+    onBomb: Boolean,
+    wins: Number
 })
 
-const User = mongoose.model('User', userSchema)
+UserSchema.pre('save', next => {
+    this.password = bcrypt.hashSync(this.password, 10)
+    next()
+})
 
-export default User
+module.exports = mongoose.model('User', UserSchema)

@@ -1,10 +1,14 @@
+'use strict'
 const mongoose = require('mongoose')
+const Schema = mongoose.Schema
 
 const gameSchema = new Schema({
-    players: [{posX: Number, posY: Number, placedBomb: Boolean }],
+    users: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+        required: true
+    },
     status: String
 })
 
-const Game = mongoose.model('Game', gameSchema)
-
-export default Game
+module.exports = mongoose.model('Game', gameSchema)

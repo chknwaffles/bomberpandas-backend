@@ -12,6 +12,7 @@ const UserSchema = new Schema({
         type: String,
         required: true,
     },
+    status: String,
     posX: Number,
     posY: Number,
     placedBomb: Boolean,
@@ -21,7 +22,6 @@ const UserSchema = new Schema({
 
 UserSchema.pre('save', function(next) {
     const user = this;
-    console.log('what is this???', this)
     bcrypt.hash(user.password, 10, (err, hash) => {
         if (err) {
             return next(err);
@@ -29,9 +29,6 @@ UserSchema.pre('save', function(next) {
         user.password = hash;
         next();
     })
-
-    console.log('in pre save', user)
-    console.log(user.password)
 })
 
 UserSchema.methods.isCorrectPassword = function(password, callback) {

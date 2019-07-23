@@ -21,7 +21,7 @@ mongoose.set('useCreateIndex', true)
 mongoose.Promise = global.Promise
 
 //express routes
-// const GameRoutes = require('./routes/GameRoutes');
+const GameRoutes = require('./routes/GameRoutes');
 const UserRoutes = require('./routes/UserRoutes')
 
 // GameRoutes(app)

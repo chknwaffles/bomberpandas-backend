@@ -6,21 +6,32 @@ const mongoose = require('mongoose')
 const User = require('./models/User')
 const Game = require('./models/Game')
 const bodyParser = require("body-parser")
-const PORT = process.env.PORT || 3000
+const GAME_PORT = process.env.PORT || 3000
+const CHAT_PORT = 3002
+const SERVER_PORT = 4000
 
 app.use(cors())
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(bodyParser.json())
 
+//MongoDB connection through mongoose
 mongoose.connect('mongodb://localhost/bomberman', { useNewUrlParser: true})
 .then(() => console.log('MongoDB connected!'))
 mongoose.set('useCreateIndex', true)
 mongoose.Promise = global.Promise
 
-const wss = new WebSocket.Server({ port: PORT })
+//express routes
+// const GameRoutes = require('./routes/GameRoutes');
+const UserRoutes = require('./routes/UserRoutes')
 
-wss.on('connection', (ws) => {
-    console.log('Connected!')
+// GameRoutes(app)
+UserRoutes(app)
+
+const gameSocket = new WebSocket.Server({ port: GAME_PORT })
+const chatSocket = new WebSocket.Server({ port: CHAT_PORT })
+
+gameSocket.on('connection', (ws) => {
+    console.log('Game connected!')
 
     ws.on('message', (data) => {
         let dataObj = JSON.parse(data)
@@ -41,7 +52,7 @@ wss.on('connection', (ws) => {
 
                 bombTimer = () => {
                     setTimeout(() => {
-                        wss.clients.forEach(client => {
+                        gameSocket.clients.forEach(client => {
                             if (client.readyState === WebSocket.OPEN) {
                                 client.send(JSON.stringify(targets))
                                 console.log('sending data', targets)
@@ -54,18 +65,31 @@ wss.on('connection', (ws) => {
                 bombTimer() 
                 break
             }
-            case 'message': {
-                wss.clients.forEach(client => {
-                    if (client !== ws && client.readyState === WebSocket.OPEN) {
-                        client.send(JSON.stringify(data))
-                        console.log('sending message back', data)
-                    }
-                })
-            }
             default: {
                 console.log('message', dataObj)
             }
         }
     })
+})
+
+chatSocket.on('connection', (ws) => {
+    console.log('Chat connected!')
+
+    ws.on('message', (data) => {
+        let dataObj = JSON.parse(data)
+
+        if (dataObj.type === 'message') {
+            wss.clients.forEach(client => {
+                if (client !== ws && client.readyState === WebSocket.OPEN) {
+                    client.send(JSON.stringify(data))
+                    console.log('sending message back', data)
+                }
+            })
+        }
+    })
+})
+
+server.listen(SERVER_PORT, () => {
+    console.log('connected to server_port')
 })
 

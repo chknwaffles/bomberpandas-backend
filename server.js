@@ -1,13 +1,13 @@
-const https = require('https')
+const http = require('http')
 const express = require('express')
 const expressWs = require('express-ws')
 const app = express()
-const server = https.createServer(app)
+const server = http.createServer(app)
 const mongoose = require('mongoose')
 const bodyParser = require("body-parser")
 const cors = require('cors')
 const User = require('./models/User')
-const Game = require('./models/Game')
+// const Game = require('./models/Game')
 
 const GAME_PORT = process.env.PORT || 3000
 const CHAT_PORT = 3002
@@ -17,7 +17,7 @@ app.use(cors())
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(bodyParser.json())
 
-expressWs(app, server)
+const expressWss = expressWs(app, server)
 //MongoDB connection through mongoose
 mongoose.connect('mongodb://localhost/bomberman', { useNewUrlParser: true})
 .then(() => console.log('MongoDB connected!'))
@@ -53,12 +53,10 @@ app.ws('/', (ws, next) => {
 
                 bombTimer = () => {
                     setTimeout(() => {
-                        gameSocket.clients.forEach(client => {
-                            if (client.readyState === WebSocket.OPEN) {
-                                client.send(JSON.stringify(targets))
-                                console.log('sending data', targets)
-                                clearTimeout(bombTimer)
-                            }
+                        expressWss.getWss('/').clients.forEach(client => {
+                            client.send(JSON.stringify(targets))
+                            console.log('sending data', targets)
+                            clearTimeout(bombTimer)
                         })
                     }, 4000)
                 }

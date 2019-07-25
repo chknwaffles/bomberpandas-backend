@@ -51,7 +51,8 @@ exports.joinGame = (req, res) => {
         } else if (!user) {
             res.status(401).json({ error: 'Must be logged in to play!'})
         } else {
-            // add user to game room
+            // add user to game room if there is one with available players
+            // if not, let's create a game room
             
         }
     }) 

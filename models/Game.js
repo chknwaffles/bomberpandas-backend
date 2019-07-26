@@ -3,12 +3,11 @@ const mongoose = require('mongoose')
 const Schema = mongoose.Schema
 
 const GameSchema = new Schema({
-    users: {
+    users: [{
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
-        required: true
-    },
+        ref: 'User'
+    }],
     status: String
 })
 
-module.exports = mongoose.model('Game', gameSchema)
+module.exports = mongoose.model('Game', GameSchema)

@@ -1,8 +1,6 @@
-const http = require('http')
 const express = require('express')
-const expressWs = require('express-ws')
 const app = express()
-const server = http.createServer(app)
+const expressWs = require('express-ws')(app)
 const mongoose = require('mongoose')
 const bodyParser = require("body-parser")
 const cors = require('cors')
@@ -15,18 +13,18 @@ app.use(cors())
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(bodyParser.json())
 
-const expressWss = expressWs(app, server)
 //MongoDB connection through mongoose
 mongoose.connect('mongodb://localhost/bomberman', { useNewUrlParser: true})
 .then(() => console.log('MongoDB connected!'))
 mongoose.set('useCreateIndex', true)
+mongoose.set('useFindAndModify', false)
 mongoose.Promise = global.Promise
 
 //express routes
 // const GameRoutes = require('./routes/GameRoutes');
 const UserRoutes = require('./routes/UserRoutes')
 
-GameRoutes(app)
+// GameRoutes(app)
 UserRoutes(app)
 
 app.ws('/game', (ws, next) => {
@@ -51,7 +49,7 @@ app.ws('/game', (ws, next) => {
 
                 bombTimer = () => {
                     setTimeout(() => {
-                        expressWss.getWss('/').clients.forEach(client => {
+                        expressWs.getWss('/').clients.forEach(client => {
                             client.send(JSON.stringify(targets))
                             console.log('sending data', targets)
                             clearTimeout(bombTimer)
@@ -69,7 +67,9 @@ app.ws('/game', (ws, next) => {
     })
 })
 
-app.get('/play', (req, res, next) => {
+app.post('/joingame', (req, res) => {
+    const { username } = req.body
+    console.log('username', username)
     User.findOne({ username }, (err, user) => {
         if (err) {
             console.error(err)
@@ -79,24 +79,29 @@ app.get('/play', (req, res, next) => {
         } else {
             // add user to game room if there is one with available players
             // if not, let's create a game room
+            console.log(user)
             Game.findOneAndUpdate({ status: 'open' }, { $push: { users: user } }, (err, game) => {
-                if (game === null) {
+                console.log('err', err)
+                console.log('game', game)
+                if (game === null || game === undefined) {
                     let newGame = new Game({ users: [user], status: 'open' })
                     newGame.save((err, savedGame) => {
                         if (err) {
                             console.log(err)
-                            return res.status(500)
+                            res.status(500).end()
                         } else {
-                            return res.json(game)
+                            res.json(savedGame).end()
                         }
                     })
                 } else {
                     // if found, let's check if it's has 3 players and you're the fourth to start the game!
-                    if (game.users.length === 1) {
+                    console.log('found game')
+                    if (game.users.length === 2) {
                         //send message to those clients that the game is ready to start
-                        game.update({ status: 'closed' })
+                        game.status = 'closed'
+                        game.save()
                     }
-                    return res.json(game)
+                    res.json(game).end()
                     // send the game to front end then send the message back to 
                 }
             })
@@ -106,13 +111,15 @@ app.get('/play', (req, res, next) => {
 
 app.ws('/play', (ws, req) => {
     console.log('In waiting room!')
-
     ws.on('message', (data) => {
         //send message back here??? then emit to other clients in my game?
-        console.log(JSON.parse(data))
-    })
-
-    
+        console.log('data', JSON.parse(data))
+        //send back to other users inside game obj
+        expressWs.getWss('/play').clients.forEach(function each(client) {
+            // console.log('client ', client)
+            // console.log('client url', client.upgradeReq)
+        })
+    })    
 })
 
 // chatSocket.on('connection', (ws) => {
@@ -132,7 +139,7 @@ app.ws('/play', (ws, req) => {
 //     })
 // })
 
-app.listen(SERVER_PORT, () => {
-    console.log('connected to server_port')
+const test = app.listen(SERVER_PORT, () => {
+    console.log('listening on port', test.address().port)
 })
 

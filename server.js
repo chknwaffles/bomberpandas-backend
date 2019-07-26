@@ -29,7 +29,7 @@ const UserRoutes = require('./routes/UserRoutes')
 GameRoutes(app)
 UserRoutes(app)
 
-app.ws('/', (ws, next) => {
+app.ws('/game', (ws, next) => {
     console.log('Game connected!')
 
     ws.on('message', (data) => {

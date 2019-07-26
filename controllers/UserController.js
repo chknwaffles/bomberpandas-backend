@@ -1,7 +1,7 @@
 'use strict'
 const mongoose = require('mongoose')
 const User = mongoose.model('User')
-// const Game = mongoose.model('Game')
+const Game = mongoose.model('Game')
 
 exports.getUsers = (req, res) => {
 
@@ -40,20 +40,4 @@ exports.authenticateUser = (req, res) => {
             })
         }
     })
-}
-
-exports.joinGame = (req, res) => {
-    const { username } = req.body
-    User.findOne({ username }, (err, user) => {
-        if (err) {
-            console.error(err)
-            res.status(500).json({ error: 'Internal error please try again' })
-        } else if (!user) {
-            res.status(401).json({ error: 'Must be logged in to play!'})
-        } else {
-            // add user to game room if there is one with available players
-            // if not, let's create a game room
-            
-        }
-    }) 
 }

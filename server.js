@@ -7,10 +7,8 @@ const mongoose = require('mongoose')
 const bodyParser = require("body-parser")
 const cors = require('cors')
 const User = require('./models/User')
-// const Game = require('./models/Game')
+const Game = require('./models/Game')
 
-const GAME_PORT = process.env.PORT || 3000
-const CHAT_PORT = 3002
 const SERVER_PORT = 4000
 
 app.use(cors())
@@ -28,7 +26,7 @@ mongoose.Promise = global.Promise
 // const GameRoutes = require('./routes/GameRoutes');
 const UserRoutes = require('./routes/UserRoutes')
 
-// GameRoutes(app)
+GameRoutes(app)
 UserRoutes(app)
 
 app.ws('/', (ws, next) => {
@@ -71,6 +69,52 @@ app.ws('/', (ws, next) => {
     })
 })
 
+app.get('/play', (req, res, next) => {
+    User.findOne({ username }, (err, user) => {
+        if (err) {
+            console.error(err)
+            res.status(500).json({ error: 'Internal error please try again' })
+        } else if (!user) {
+            res.status(401).json({ error: 'Must be logged in to play!'})
+        } else {
+            // add user to game room if there is one with available players
+            // if not, let's create a game room
+            Game.findOneAndUpdate({ status: 'open' }, { $push: { users: user } }, (err, game) => {
+                if (game === null) {
+                    let newGame = new Game({ users: [user], status: 'open' })
+                    newGame.save((err, savedGame) => {
+                        if (err) {
+                            console.log(err)
+                            return res.status(500)
+                        } else {
+                            return res.json(game)
+                        }
+                    })
+                } else {
+                    // if found, let's check if it's has 3 players and you're the fourth to start the game!
+                    if (game.users.length === 1) {
+                        //send message to those clients that the game is ready to start
+                        game.update({ status: 'closed' })
+                    }
+                    return res.json(game)
+                    // send the game to front end then send the message back to 
+                }
+            })
+        }
+    }) 
+})  
+
+app.ws('/play', (ws, req) => {
+    console.log('In waiting room!')
+
+    ws.on('message', (data) => {
+        //send message back here??? then emit to other clients in my game?
+        console.log(JSON.parse(data))
+    })
+
+    
+})
+
 // chatSocket.on('connection', (ws) => {
 //     console.log('Chat connected!')
 
@@ -88,7 +132,7 @@ app.ws('/', (ws, next) => {
 //     })
 // })
 
-server.listen(SERVER_PORT, () => {
+app.listen(SERVER_PORT, () => {
     console.log('connected to server_port')
 })
 

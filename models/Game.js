@@ -2,7 +2,7 @@
 const mongoose = require('mongoose')
 const Schema = mongoose.Schema
 
-const gameSchema = new Schema({
+const GameSchema = new Schema({
     users: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User',

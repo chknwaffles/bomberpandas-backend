@@ -1,12 +1,9 @@
 'use strict'
 const mongoose = require('mongoose')
 const Schema = mongoose.Schema
-
+const Player = new Schema({ username: String, x: Number, y: Number, placedBomb: Boolean, onBomb: Boolean, gameId: String})
 const GameSchema = new Schema({
-    users: [{
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'User'
-    }],
+    users: [Player],
     status: String
 })
 

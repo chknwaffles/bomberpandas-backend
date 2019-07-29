@@ -1,40 +1,26 @@
 'use strict'
 const mongoose = require('mongoose')
-const bcrypt = require('bcrypt')
 const Schema = mongoose.Schema
+const passportLocalMongoose = require('passport-local-mongoose')
 
 const UserSchema = new Schema({
     username: {
         type: String,
         unique: true,
     },
-    password: {
-        type: String,
-        required: true,
-    },
+    password: String,
     status: String,
     posX: Number,
     posY: Number,
     placedBomb: Boolean,
     onBomb: Boolean,
-    wins: Number
+    wins: Number,
+    game: {
+        type: Schema.Types.ObjectId,
+        ref: 'Game'
+    }
 })
 
-UserSchema.pre('save', function(next) {
-    const user = this;
-    bcrypt.hash(user.password, 10, (err, hash) => {
-        if (err) {
-            return next(err);
-        }
-        user.password = hash;
-        next();
-    })
-})
-
-UserSchema.methods.isCorrectPassword = function(password, callback) {
-    bcrypt.compare(password, this.password, (err, same) => {
-        err ? callback(err) : callback(err, same)
-    })
-}
+UserSchema.plugin(passportLocalMongoose)
 
 module.exports = mongoose.model('User', UserSchema)

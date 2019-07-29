@@ -4,14 +4,27 @@ const expressWs = require('express-ws')(app)
 const mongoose = require('mongoose')
 const bodyParser = require("body-parser")
 const cors = require('cors')
+const cookieParser = require('cookie-parser');
+const session = require('cookie-session');
+const passport = require('passport')
+const Strategy = require('passport-local').Strategy
 const User = require('./models/User')
 const Game = require('./models/Game')
-
 const SERVER_PORT = 4000
 
+//express routes
+const createWaitingRooms = require('./controllers/WaitingRoomController')
+const UserRoutes = require('./routes/UserRoutes')
+const waitingRooms = createWaitingRooms()
+
 app.use(cors())
-app.use(bodyParser.urlencoded({ extended: false }))
 app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({ extended: false }))
+app.use(cookieParser());
+app.use(session({ secret: 'super secret cat' }))
+app.use(passport.initialize())
+app.use(passport.session())
+UserRoutes(app)
 
 //MongoDB connection through mongoose
 mongoose.connect('mongodb://localhost/bomberman', { useNewUrlParser: true})
@@ -20,12 +33,10 @@ mongoose.set('useCreateIndex', true)
 mongoose.set('useFindAndModify', false)
 mongoose.Promise = global.Promise
 
-//express routes
-// const GameRoutes = require('./routes/GameRoutes');
-const UserRoutes = require('./routes/UserRoutes')
-
-// GameRoutes(app)
-UserRoutes(app)
+//passport user auth
+passport.use(new Strategy(User.authenticate()))
+passport.serializeUser(User.serializeUser())
+passport.deserializeUser(User.deserializeUser())
 
 app.ws('/game', (ws, next) => {
     console.log('Game connected!')
@@ -69,7 +80,6 @@ app.ws('/game', (ws, next) => {
 
 app.post('/joingame', (req, res) => {
     const { username } = req.body
-    console.log('username', username)
     User.findOne({ username }, (err, user) => {
         if (err) {
             console.error(err)
@@ -79,47 +89,60 @@ app.post('/joingame', (req, res) => {
         } else {
             // add user to game room if there is one with available players
             // if not, let's create a game room
-            console.log(user)
-            Game.findOneAndUpdate({ status: 'open' }, { $push: { users: user } }, (err, game) => {
-                console.log('err', err)
-                console.log('game', game)
+            Game.findOne({ users: { $nin: [user] }, status: 'open' }, (err, game) => {
+                if (err) console.error(err)
+                let newPlayer = { username: user.username, x: 0, y: 0, placedBomb: false, onBomb: false, gameId: null }
+
                 if (game === null || game === undefined) {
-                    let newGame = new Game({ users: [user], status: 'open' })
+                    let newGame = new Game({ users: [newPlayer], status: 'open' })
                     newGame.save((err, savedGame) => {
                         if (err) {
                             console.log(err)
-                            res.status(500).end()
+                            res.status(500)
                         } else {
-                            res.json(savedGame).end()
+                            console.log(user.username + ' is making new game!')
+                            waitingRooms.createRoom(savedGame.id)
+                            user.gameId = savedGame.id
+                            user.save()
+                            res.json(savedGame)
                         }
                     })
                 } else {
-                    // if found, let's check if it's has 3 players and you're the fourth to start the game!
-                    console.log('found game')
-                    if (game.users.length === 2) {
-                        //send message to those clients that the game is ready to start
-                        game.status = 'closed'
-                        game.save()
-                    }
-                    res.json(game).end()
-                    // send the game to front end then send the message back to 
+                    game.status = 'closed'
+                    game.users.push(newPlayer)
+                    game.save()
+                    user.game = game
+                    user.save()
+                    waitingRooms.emitMessage(game.id, user, game)
+                    res.json(game)
                 }
             })
         }
     }) 
 })  
 
-app.ws('/play', (ws, req) => {
-    console.log('In waiting room!')
+app.ws('/play', (ws, req) => {    
+    console.log('in play socket')
+    
+    passport.authenticate('local')(req, res, () => {
+        console.log(req.user)
+        waitingRooms.addConnection(ws, req.user, req.user.gameId)
+    })
+
     ws.on('message', (data) => {
         //send message back here??? then emit to other clients in my game?
-        console.log('data', JSON.parse(data))
-        //send back to other users inside game obj
-        expressWs.getWss('/play').clients.forEach(function each(client) {
-            // console.log('client ', client)
-            // console.log('client url', client.upgradeReq)
+        let gameObj = JSON.parse(data)
+        console.log(gameObj)
+        // send back to other users inside game obj
+        gameObj.users.forEach(user => {
+            console.log('sending message to ' + user.username)
+            waitingRooms.emitMessage(ws, user.username, gameObj)
         })
-    })    
+    })
+
+    ws.on('close', (code, reason) => {
+        waitingRooms.removeConnection(ws, req.user)
+    })
 })
 
 // chatSocket.on('connection', (ws) => {

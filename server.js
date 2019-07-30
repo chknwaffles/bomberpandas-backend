@@ -1,11 +1,11 @@
 const express = require('express')
 const app = express()
-const expressWs = require('express-ws')(app)
+const expressWs = require('express-ws')(app, )
 const mongoose = require('mongoose')
 const bodyParser = require("body-parser")
 const cors = require('cors')
-const cookieParser = require('cookie-parser');
-const session = require('cookie-session');
+const cookieParser = require('cookie-parser')
+const session = require('cookie-session')
 const passport = require('passport')
 const Strategy = require('passport-local').Strategy
 const User = require('./models/User')
@@ -21,22 +21,33 @@ app.use(cors())
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(cookieParser());
-app.use(session({ secret: 'super secret cat' }))
-app.use(passport.initialize())
-app.use(passport.session())
-UserRoutes(app)
+app.use(session({ secret: 'super secret cat', cookie: { secure: false } }))
 
 //MongoDB connection through mongoose
 mongoose.connect('mongodb://localhost/bomberman', { useNewUrlParser: true})
 .then(() => console.log('MongoDB connected!'))
 mongoose.set('useCreateIndex', true)
-mongoose.set('useFindAndModify', false)
+// mongoose.set('useFindAndModify', false)
 mongoose.Promise = global.Promise
 
 //passport user auth
-passport.use(new Strategy(User.authenticate()))
-passport.serializeUser(User.serializeUser())
-passport.deserializeUser(User.deserializeUser())
+passport.use(User.createStrategy())
+passport.serializeUser((user, done) => {
+    console.log('serializing', user)
+    done(null, user.id)
+})
+passport.deserializeUser((id, done) => {
+    console.log('deserializing')
+    console.log(id)
+    User.findById(id, (err, user) => {
+        if (err) console.log('error', err)
+        done(err, user)
+    })
+})
+app.use(passport.initialize())
+app.use(passport.session())
+
+app.use('/', require('./routes/UserRoutes'))
 
 app.ws('/game', (ws, next) => {
     console.log('Game connected!')
@@ -123,7 +134,10 @@ app.post('/joingame', (req, res) => {
 
 app.ws('/play', (ws, req) => {    
     console.log('in play socket')
-    
+    // console.log('req', req)
+    console.log(ws.upgradeReq)
+    console.log('req passport', req.session.passport)
+    console.log(req.isAuthenticated())
     passport.authenticate('local')(req, res, () => {
         console.log(req.user)
         waitingRooms.addConnection(ws, req.user, req.user.gameId)
@@ -166,3 +180,4 @@ const test = app.listen(SERVER_PORT, () => {
     console.log('listening on port', test.address().port)
 })
 
+module.exports = app

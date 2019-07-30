@@ -1,27 +1,27 @@
 const express = require('express')
 const app = express()
-const expressWs = require('express-ws')(app, )
+
 const mongoose = require('mongoose')
 const bodyParser = require("body-parser")
 const cors = require('cors')
-const cookieParser = require('cookie-parser')
-const session = require('cookie-session')
+const session = require('express-session')
 const passport = require('passport')
 const Strategy = require('passport-local').Strategy
 const User = require('./models/User')
 const Game = require('./models/Game')
 const SERVER_PORT = 4000
 
+const expressWs = require('express-ws')(app)
+
 //express routes
-const createWaitingRooms = require('./controllers/WaitingRoomController')
 const UserRoutes = require('./routes/UserRoutes')
+const createWaitingRooms = require('./controllers/WaitingRoomController')
 const waitingRooms = createWaitingRooms()
 
 app.use(cors())
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: false }))
-app.use(cookieParser());
-app.use(session({ secret: 'super secret cat', cookie: { secure: false } }))
+app.use(session({ secret: 'super secret cat', resave: false, saveUninitialized: true, cookie: { secure: false } }))
 
 //MongoDB connection through mongoose
 mongoose.connect('mongodb://localhost/bomberman', { useNewUrlParser: true})

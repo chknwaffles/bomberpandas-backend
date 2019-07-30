@@ -4,6 +4,9 @@ module.exports = function createWaitingRooms() {
     let rooms = {}
 
     return {
+        // addUser: (user, gameId) => {
+        //     rooms[gameId].push({ username: })
+        // },
         addConnection: (ws, user, gameId) => {
             console.log(user)
             console.log(gameId)

@@ -1,6 +1,8 @@
 const passport = require('passport')
 const User = require('../models/User')
 const router = require('express').Router()
+const createWaitingRooms = require('../controllers/WaitingRoomController')
+const waitingRooms = createWaitingRooms()
 
 router.post('/register', (req, res, next) => {
     User.register(new User({ username: req.body.username }), req.body.password, (err, user) => {
@@ -15,6 +17,7 @@ router.post('/register', (req, res, next) => {
 })
 
 router.post('/login', passport.authenticate('local'), (req, res) => {
+    console.log(req.session.passport)
     res.json(req.user)
 })
 

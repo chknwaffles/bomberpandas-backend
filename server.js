@@ -17,6 +17,7 @@ const expressWs = require('express-ws')(app)
 const UserRoutes = require('./routes/UserRoutes')
 const createWaitingRooms = require('./controllers/WaitingRoomController')
 const waitingRooms = createWaitingRooms()
+const gameController = require('./controllers/GameController')
 
 app.use(cors())
 app.use(bodyParser.json())
@@ -52,20 +53,13 @@ app.ws('/game', (ws, next) => {
 
     ws.on('message', (data) => {
         let dataObj = JSON.parse(data)
-
+        console.log(dataObj)
         switch(dataObj.type) {
             case 'B': {
                 // send targets to explode
                 let targetRow = (dataObj.x)
                 let targetCol = (dataObj.y)
-                let targets = [
-                    'BOMB TARGETS',
-                    { x: targetRow - 1, y: targetCol },
-                    { x: targetRow, y: targetCol - 1 },
-                    { x: targetRow, y: targetCol },
-                    { x: targetRow + 1, y: targetCol },
-                    { x: targetRow, y: targetCol + 1 },
-                ]
+                let targets = gameController.getBombTargets(targetRow, targetCol, dataObj.powerups.fire, dataObj.id)
 
                 bombTimer = () => {
                     setTimeout(() => {
@@ -156,23 +150,6 @@ app.ws('/play', (ws, req) => {
         waitingRooms.removeConnection(ws, req.user)
     })
 })
-
-// chatSocket.on('connection', (ws) => {
-//     console.log('Chat connected!')
-
-//     ws.on('message', (data) => {
-//         let dataObj = JSON.parse(data)
-
-//         if (dataObj.type === 'message') {
-//             wss.clients.forEach(client => {
-//                 if (client !== ws && client.readyState === WebSocket.OPEN) {
-//                     client.send(JSON.stringify(data))
-//                     console.log('sending message back', data)
-//                 }
-//             })
-//         }
-//     })
-// })
 
 const test = app.listen(SERVER_PORT, () => {
     console.log('listening on port', test.address().port)

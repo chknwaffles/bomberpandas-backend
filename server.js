@@ -24,11 +24,9 @@ app.use(bodyParser.urlencoded({ extended: false }))
 app.use(session({ secret: 'super secret cat', resave: false, saveUninitialized: true, cookie: { secure: false } }))
 
 //MongoDB connection through mongoose
-mongoose.connect('mongodb://localhost/bomberman', { useNewUrlParser: true})
+mongoose.connect('mongodb://localhost/bomberman', { useNewUrlParser: true })
 .then(() => console.log('MongoDB connected!'))
 mongoose.set('useCreateIndex', true)
-// mongoose.set('useFindAndModify', false)
-mongoose.Promise = global.Promise
 
 //passport user auth
 passport.use(User.createStrategy())

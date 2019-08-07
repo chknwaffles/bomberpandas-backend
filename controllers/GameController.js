@@ -13,10 +13,10 @@ module.exports = {
         ]
         if (fireLevel > 1) {
             for(let i = fireLevel; i > 1; i--) {
-                result.push({ x: row - fireLevel, y: col })
-                result.push({ x: row, y: col - fireLevel })
-                result.push({ x: row + fireLevel, y: col })
-                result.push({ x: row, y: col + fireLevel })
+                result.push({ x: row - i, y: col })
+                result.push({ x: row, y: col - i })
+                result.push({ x: row + i, y: col })
+                result.push({ x: row, y: col + i })
             }
         }
         return result

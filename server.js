@@ -1,56 +1,60 @@
-const express = require('express')
-const app = express()
+var app = require('express')()
+var mongoose = require('mongoose')
+var bodyParser = require("body-parser")
+var cors = require('cors')
+var session = require('express-session')
+var passport = require('passport')
+var User = require('./models/User')
+var Game = require('./models/Game')
+var SERVER_PORT = 4000
 
-const mongoose = require('mongoose')
-const bodyParser = require("body-parser")
-const cors = require('cors')
-const session = require('express-session')
-const passport = require('passport')
-const Strategy = require('passport-local').Strategy
-const User = require('./models/User')
-const Game = require('./models/Game')
-const SERVER_PORT = 4000
-
-const expressWs = require('express-ws')(app)
+const wsOptions = {
+    verifyClient: (info, done) => {
+        sessionParser(info.req, {}, () => {
+            console.log(info.req.session)
+            done(info.req.session)
+        })
+    }
+}
+const expressWs = require('express-ws')(app, undefined, { wsOptions: wsOptions })
 
 //express routes
-const UserRoutes = require('./routes/UserRoutes')
-const createWaitingRooms = require('./controllers/WaitingRoomController')
-const waitingRooms = createWaitingRooms()
-const gameController = require('./controllers/GameController')
+var UserRoutes = require('./routes/UserRoutes')
+var createWaitingRooms = require('./controllers/WaitingRoomController')
+var waitingRooms = createWaitingRooms()
+var gameController = require('./controllers/GameController')
+
+const sessionParser = session({ 
+    secret: 'super secret cat', 
+    resave: false, 
+    saveUninitialized: false, 
+    cookie: { secure: false } 
+})
 
 app.use(cors())
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: false }))
-app.use(session({ secret: 'super secret cat', resave: false, saveUninitialized: true, cookie: { secure: false } }))
+app.use(sessionParser)
+
+//passport user auth
+passport.use(User.createStrategy())
+passport.serializeUser(User.serializeUser())
+passport.deserializeUser(User.deserializeUser())
+
+app.use(passport.initialize())
+app.use(passport.session())
 
 //MongoDB connection through mongoose
 mongoose.connect('mongodb://localhost/bomberman', { useNewUrlParser: true })
 .then(() => console.log('MongoDB connected!'))
 mongoose.set('useCreateIndex', true)
 
-//passport user auth
-passport.use(User.createStrategy())
-passport.serializeUser((user, done) => {
-    console.log('serializing', user)
-    done(null, user.id)
-})
-passport.deserializeUser((id, done) => {
-    console.log('deserializing')
-    console.log(id)
-    User.findById(id, (err, user) => {
-        if (err) console.log('error', err)
-        done(err, user)
-    })
-})
-app.use(passport.initialize())
-app.use(passport.session())
-
 app.use('/', require('./routes/UserRoutes'))
 
-app.ws('/game', (ws, next) => {
+app.ws('/game', (ws, req) => {
     console.log('Game connected!')
-
+    console.log('req user connected', req.session.passport.user)
+    
     ws.on('message', (data) => {
         let dataObj = JSON.parse(data)
         console.log(dataObj)
@@ -107,6 +111,7 @@ app.post('/joingame', (req, res) => {
                             waitingRooms.createRoom(savedGame.id)
                             user.gameId = savedGame.id
                             user.save()
+                            waitingRooms.printRoom(savedGame.id)
                             res.json(savedGame)
                         }
                     })
@@ -125,20 +130,14 @@ app.post('/joingame', (req, res) => {
 })  
 
 app.ws('/play', (ws, req) => {    
-    console.log('in play socket')
-    // console.log('req', req)
-    console.log(ws.upgradeReq)
-    console.log('req passport', req.session.passport)
-    console.log(req.isAuthenticated())
-    passport.authenticate('local')(req, res, () => {
-        console.log(req.user)
-        waitingRooms.addConnection(ws, req.user, req.user.gameId)
-    })
-
+    console.log('req user connected')
+    console.log(req.passport.user)
+    console.log(req.user)
     ws.on('message', (data) => {
         //send message back here??? then emit to other clients in my game?
         let gameObj = JSON.parse(data)
         console.log(gameObj)
+        console.log('game data received!')
         // send back to other users inside game obj
         gameObj.users.forEach(user => {
             console.log('sending message to ' + user.username)

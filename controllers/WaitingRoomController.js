@@ -30,6 +30,9 @@ module.exports = function createWaitingRooms() {
         printList: () => {
             console.log(rooms)
         },
+        printRoom: (gameId) => {
+          rooms[gameId].forEach((player, i) => console.log('player ', i, player.username))  
+        },
         createRoom: (gameId) => {
             rooms[gameId] = []
         }

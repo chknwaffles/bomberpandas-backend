@@ -1,32 +1,43 @@
 var app = require('express')()
-var http = require('http')
-const PORT = process.env.port || 4000
-var server = http.createServer(app).listen(PORT)
-var io = require('socket.io').listen(server)
+var http = require('http').Server()
+
+var io = require('socket.io')(http)
 var mongoose = require('mongoose')
+var MongoDBStore = require('connect-mongodb-session')(session)
 var bodyParser = require("body-parser")
 var cors = require('cors')
 var session = require('express-session')
 
 var User = require('./models/User')
 var Game = require('./models/Game')
-
+var PORT = process.env.port || 4000
 //express routes
 var UserRoutes = require('./routes/UserRoutes')
 var gameController = require('./controllers/GameController')
 var bombTimer
 
-const sessionParser = session({ 
-    secret: 'super secret cat', 
-    resave: false, 
-    saveUninitialized: false, 
-    cookie: { secure: false } 
+var store = new MongoDBStore({
+    uri: process.env.MONGODB_URI,
+    collection: 'mySessions',
+    useUnifiedTopology: true
+})
+
+store.on('error', function(error) {
+    console.log(error)
 })
 
 app.use(cors())
 app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: false }))
-app.use(sessionParser)
+app.use(session({
+    secret: 'boidonteven',
+    cookie: {
+      maxAge: 1000 * 60 * 60 * 24 * 7 // 1 week
+    },
+    store: store,
+    resave: true,
+    saveUninitialized: true
+}))
 
 //MongoDB connection through mongoose
 mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true })
@@ -153,5 +164,9 @@ app.post('/joingame', (req, res) => {
 //         waitingRooms.removeConnection(ws, req.user)
 //     })
 // })
+
+http.listen(PORT, () => {
+    console.log('listening on *:', PORT)
+})
 
 module.exports = app

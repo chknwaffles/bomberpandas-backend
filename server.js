@@ -1,16 +1,15 @@
 var app = require('express')()
 var http = require('http').Server()
-
 var io = require('socket.io')(http)
+var session = require('express-session')
 var mongoose = require('mongoose')
 var MongoDBStore = require('connect-mongodb-session')(session)
 var bodyParser = require("body-parser")
 var cors = require('cors')
-var session = require('express-session')
 
 var User = require('./models/User')
 var Game = require('./models/Game')
-var PORT = process.env.port || 4000
+var port = process.env.PORT || 4000
 //express routes
 var UserRoutes = require('./routes/UserRoutes')
 var gameController = require('./controllers/GameController')
@@ -165,8 +164,8 @@ app.post('/joingame', (req, res) => {
 //     })
 // })
 
-http.listen(PORT, () => {
-    console.log('listening on *:', PORT)
+http.listen(port, () => {
+    console.log('listening on *:', port)
 })
 
 module.exports = app

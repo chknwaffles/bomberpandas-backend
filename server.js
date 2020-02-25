@@ -1,28 +1,19 @@
 var app = require('express')()
+var http = require('http')
+var server = http.createServer(app).listen(4000)
+var io = require('socket.io').listen(server)
 var mongoose = require('mongoose')
 var bodyParser = require("body-parser")
 var cors = require('cors')
 var session = require('express-session')
-var passport = require('passport')
+
 var User = require('./models/User')
 var Game = require('./models/Game')
-var SERVER_PORT = 4000
-
-const wsOptions = {
-    verifyClient: (info, done) => {
-        sessionParser(info.req, {}, () => {
-            console.log(info.req.session)
-            done(info.req.session)
-        })
-    }
-}
-const expressWs = require('express-ws')(app, undefined, { wsOptions: wsOptions })
 
 //express routes
 var UserRoutes = require('./routes/UserRoutes')
-var createWaitingRooms = require('./controllers/WaitingRoomController')
-var waitingRooms = createWaitingRooms()
 var gameController = require('./controllers/GameController')
+var bombTimer
 
 const sessionParser = session({ 
     secret: 'super secret cat', 
@@ -36,14 +27,6 @@ app.use(bodyParser.json())
 app.use(bodyParser.urlencoded({ extended: false }))
 app.use(sessionParser)
 
-//passport user auth
-passport.use(User.createStrategy())
-passport.serializeUser(User.serializeUser())
-passport.deserializeUser(User.deserializeUser())
-
-app.use(passport.initialize())
-app.use(passport.session())
-
 //MongoDB connection through mongoose
 mongoose.connect('mongodb://localhost/bomberman', { useNewUrlParser: true })
 .then(() => console.log('MongoDB connected!'))
@@ -51,37 +34,57 @@ mongoose.set('useCreateIndex', true)
 
 app.use('/', require('./routes/UserRoutes'))
 
-app.ws('/game', (ws, req) => {
-    console.log('Game connected!')
-    console.log('req user connected', req.session.passport.user)
-    
-    ws.on('message', (data) => {
-        let dataObj = JSON.parse(data)
-        console.log(dataObj)
-        switch(dataObj.type) {
-            case 'B': {
-                // send targets to explode
-                let targetRow = (dataObj.x)
-                let targetCol = (dataObj.y)
-                let targets = gameController.getBombTargets(targetRow, targetCol, dataObj.powerups.fire, dataObj.id)
+io.sockets.on('connection', function (socket) {
 
-                bombTimer = () => {
-                    setTimeout(() => {
-                        expressWs.getWss('/').clients.forEach(client => {
-                            client.send(JSON.stringify(targets))
-                            console.log('sending data', targets)
-                            clearTimeout(bombTimer)
-                        })
-                    }, 4000)
-                }
+    socket.on('adduser', username => { 
+        // // store the username in the socket session for this client
+		// socket.username = username;
+		// // store the room name in the socket session for this client
+		// socket.room = 'room1';
+		// // add the client's username to the global list
+		// usernames[username] = username;
+		// // send client to room 1
+		// socket.join('room1');
+		// // echo to client they've connected
+		// socket.emit('updatechat', 'SERVER', 'you have connected to room1');
+		// // echo to room 1 that a person has connected to their room
+		// socket.broadcast.to('room1').emit('updatechat', 'SERVER', username + ' has connected to this room');
+		// socket.emit('updaterooms', rooms, 'room1');
+    })
 
-                bombTimer() 
-                break
-            }
-            default: {
-                console.log('message', dataObj)
-            }
+    socket.on('game', game => {
+        socket.join(game)
+    })
+
+    socket.on('local-game', game => {
+        socket.join('local-game')
+        console.log('joined local game!')
+    })
+
+    socket.on('senddata', data => {
+        //need to grab data on player movement/bombs
+
+        //emit it to them back
+        //io.sockets.in(socket.room).emit('updategame', socket.username, data)
+    })
+
+    socket.on('sendlocal', data => {
+        if (data.type === 'B') {
+            let tRow = data.x
+            let tCol = data.y
+            let targets = gameController.getBombTargets(tRow, tCol, data.powerups.fire, data.id)
+            bombTimer = setTimeout(() => {
+                io.sockets.in('local-game').emit('bombmsg', targets)
+            }, 4000)
         }
+    })
+
+    socket.on('updategame', data => {
+
+    })
+
+    socket.on('disconnect', reason => {
+        console.log('user disconnected!')
     })
 })
 
@@ -129,29 +132,25 @@ app.post('/joingame', (req, res) => {
     }) 
 })  
 
-app.ws('/play', (ws, req) => {    
-    console.log('req user connected')
-    console.log(req.passport.user)
-    console.log(req.user)
-    ws.on('message', (data) => {
-        //send message back here??? then emit to other clients in my game?
-        let gameObj = JSON.parse(data)
-        console.log(gameObj)
-        console.log('game data received!')
-        // send back to other users inside game obj
-        gameObj.users.forEach(user => {
-            console.log('sending message to ' + user.username)
-            waitingRooms.emitMessage(ws, user.username, gameObj)
-        })
-    })
+// app.ws('/play', (ws, req) => {    
+//     console.log('req user connected')
+//     console.log(req.passport.user)
+//     console.log(req.user)
+//     ws.on('message', (data) => {
+//         //send message back here??? then emit to other clients in my game?
+//         let gameObj = JSON.parse(data)
+//         console.log(gameObj)
+//         console.log('game data received!')
+//         // send back to other users inside game obj
+//         gameObj.users.forEach(user => {
+//             console.log('sending message to ' + user.username)
+//             waitingRooms.emitMessage(ws, user.username, gameObj)
+//         })
+//     })
 
-    ws.on('close', (code, reason) => {
-        waitingRooms.removeConnection(ws, req.user)
-    })
-})
-
-const test = app.listen(SERVER_PORT, () => {
-    console.log('listening on port', test.address().port)
-})
+//     ws.on('close', (code, reason) => {
+//         waitingRooms.removeConnection(ws, req.user)
+//     })
+// })
 
 module.exports = app

@@ -1,13 +1,11 @@
 const passport = require('passport')
 const User = require('../models/User')
 const router = require('express').Router()
-const createWaitingRooms = require('../controllers/WaitingRoomController')
-const waitingRooms = createWaitingRooms()
 
 router.post('/register', (req, res, next) => {
     User.register(new User({ username: req.body.username }), req.body.password, (err, user) => {
         if (err) {
-            console.log('error while user register!', err)
+            console.log(err)
             return next(err)
         } else {
             passport.authenticate('local')

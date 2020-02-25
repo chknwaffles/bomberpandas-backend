@@ -28,7 +28,7 @@ app.use(bodyParser.urlencoded({ extended: false }))
 app.use(sessionParser)
 
 //MongoDB connection through mongoose
-mongoose.connect('mongodb://localhost/bomberman', { useNewUrlParser: true })
+mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true })
 .then(() => console.log('MongoDB connected!'))
 mongoose.set('useCreateIndex', true)
 

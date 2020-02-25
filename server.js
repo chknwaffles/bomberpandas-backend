@@ -1,75 +1,95 @@
-const express = require('express')
-const app = express()
-const expressWs = require('express-ws')(app)
-const mongoose = require('mongoose')
-const bodyParser = require("body-parser")
-const cors = require('cors')
-const User = require('./models/User')
-const Game = require('./models/Game')
+var app = require('express')()
+var http = require('http')
+var server = http.createServer(app).listen(4000)
+var io = require('socket.io').listen(server)
+var mongoose = require('mongoose')
+var bodyParser = require("body-parser")
+var cors = require('cors')
+var session = require('express-session')
 
-const SERVER_PORT = 4000
-
-app.use(cors())
-app.use(bodyParser.urlencoded({ extended: false }))
-app.use(bodyParser.json())
-
-//MongoDB connection through mongoose
-mongoose.connect('mongodb://localhost/bomberman', { useNewUrlParser: true})
-.then(() => console.log('MongoDB connected!'))
-mongoose.set('useCreateIndex', true)
-mongoose.set('useFindAndModify', false)
-mongoose.Promise = global.Promise
+var User = require('./models/User')
+var Game = require('./models/Game')
 
 //express routes
-// const GameRoutes = require('./routes/GameRoutes');
-const UserRoutes = require('./routes/UserRoutes')
+var UserRoutes = require('./routes/UserRoutes')
+var gameController = require('./controllers/GameController')
+var bombTimer
 
-// GameRoutes(app)
-UserRoutes(app)
+const sessionParser = session({ 
+    secret: 'super secret cat', 
+    resave: false, 
+    saveUninitialized: false, 
+    cookie: { secure: false } 
+})
 
-app.ws('/game', (ws, next) => {
-    console.log('Game connected!')
+app.use(cors())
+app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({ extended: false }))
+app.use(sessionParser)
 
-    ws.on('message', (data) => {
-        let dataObj = JSON.parse(data)
+//MongoDB connection through mongoose
+mongoose.connect('mongodb://localhost/bomberman', { useNewUrlParser: true })
+.then(() => console.log('MongoDB connected!'))
+mongoose.set('useCreateIndex', true)
 
-        switch(dataObj.type) {
-            case 'B': {
-                // send targets to explode
-                let targetRow = (dataObj.x)
-                let targetCol = (dataObj.y)
-                let targets = [
-                    'BOMB TARGETS',
-                    { x: targetRow - 1, y: targetCol },
-                    { x: targetRow, y: targetCol - 1 },
-                    { x: targetRow, y: targetCol },
-                    { x: targetRow + 1, y: targetCol },
-                    { x: targetRow, y: targetCol + 1 },
-                ]
+app.use('/', require('./routes/UserRoutes'))
 
-                bombTimer = () => {
-                    setTimeout(() => {
-                        expressWs.getWss('/').clients.forEach(client => {
-                            client.send(JSON.stringify(targets))
-                            console.log('sending data', targets)
-                            clearTimeout(bombTimer)
-                        })
-                    }, 4000)
-                }
+io.sockets.on('connection', function (socket) {
 
-                bombTimer() 
-                break
-            }
-            default: {
-                console.log('message', dataObj)
-            }
+    socket.on('adduser', username => { 
+        // // store the username in the socket session for this client
+		// socket.username = username;
+		// // store the room name in the socket session for this client
+		// socket.room = 'room1';
+		// // add the client's username to the global list
+		// usernames[username] = username;
+		// // send client to room 1
+		// socket.join('room1');
+		// // echo to client they've connected
+		// socket.emit('updatechat', 'SERVER', 'you have connected to room1');
+		// // echo to room 1 that a person has connected to their room
+		// socket.broadcast.to('room1').emit('updatechat', 'SERVER', username + ' has connected to this room');
+		// socket.emit('updaterooms', rooms, 'room1');
+    })
+
+    socket.on('game', game => {
+        socket.join(game)
+    })
+
+    socket.on('local-game', game => {
+        socket.join('local-game')
+        console.log('joined local game!')
+    })
+
+    socket.on('senddata', data => {
+        //need to grab data on player movement/bombs
+
+        //emit it to them back
+        //io.sockets.in(socket.room).emit('updategame', socket.username, data)
+    })
+
+    socket.on('sendlocal', data => {
+        if (data.type === 'B') {
+            let tRow = data.x
+            let tCol = data.y
+            let targets = gameController.getBombTargets(tRow, tCol, data.powerups.fire, data.id)
+            bombTimer = setTimeout(() => {
+                io.sockets.in('local-game').emit('bombmsg', targets)
+            }, 4000)
         }
+    })
+
+    socket.on('updategame', data => {
+
+    })
+
+    socket.on('disconnect', reason => {
+        console.log('user disconnected!')
     })
 })
 
 app.post('/joingame', (req, res) => {
     const { username } = req.body
-    console.log('username', username)
     User.findOne({ username }, (err, user) => {
         if (err) {
             console.error(err)
@@ -79,67 +99,58 @@ app.post('/joingame', (req, res) => {
         } else {
             // add user to game room if there is one with available players
             // if not, let's create a game room
-            console.log(user)
-            Game.findOneAndUpdate({ status: 'open' }, { $push: { users: user } }, (err, game) => {
-                console.log('err', err)
-                console.log('game', game)
+            Game.findOne({ users: { $nin: [user] }, status: 'open' }, (err, game) => {
+                if (err) console.error(err)
+                let newPlayer = { username: user.username, x: 0, y: 0, placedBomb: false, onBomb: false, gameId: null }
+
                 if (game === null || game === undefined) {
-                    let newGame = new Game({ users: [user], status: 'open' })
+                    let newGame = new Game({ users: [newPlayer], status: 'open' })
                     newGame.save((err, savedGame) => {
                         if (err) {
                             console.log(err)
-                            res.status(500).end()
+                            res.status(500)
                         } else {
-                            res.json(savedGame).end()
+                            console.log(user.username + ' is making new game!')
+                            waitingRooms.createRoom(savedGame.id)
+                            user.gameId = savedGame.id
+                            user.save()
+                            waitingRooms.printRoom(savedGame.id)
+                            res.json(savedGame)
                         }
                     })
                 } else {
-                    // if found, let's check if it's has 3 players and you're the fourth to start the game!
-                    console.log('found game')
-                    if (game.users.length === 2) {
-                        //send message to those clients that the game is ready to start
-                        game.status = 'closed'
-                        game.save()
-                    }
-                    res.json(game).end()
-                    // send the game to front end then send the message back to 
+                    game.status = 'closed'
+                    game.users.push(newPlayer)
+                    game.save()
+                    user.game = game
+                    user.save()
+                    waitingRooms.emitMessage(game.id, user, game)
+                    res.json(game)
                 }
             })
         }
     }) 
 })  
 
-app.ws('/play', (ws, req) => {
-    console.log('In waiting room!')
-    ws.on('message', (data) => {
-        //send message back here??? then emit to other clients in my game?
-        console.log('data', JSON.parse(data))
-        //send back to other users inside game obj
-        expressWs.getWss('/play').clients.forEach(function each(client) {
-            // console.log('client ', client)
-            // console.log('client url', client.upgradeReq)
-        })
-    })    
-})
-
-// chatSocket.on('connection', (ws) => {
-//     console.log('Chat connected!')
-
+// app.ws('/play', (ws, req) => {    
+//     console.log('req user connected')
+//     console.log(req.passport.user)
+//     console.log(req.user)
 //     ws.on('message', (data) => {
-//         let dataObj = JSON.parse(data)
+//         //send message back here??? then emit to other clients in my game?
+//         let gameObj = JSON.parse(data)
+//         console.log(gameObj)
+//         console.log('game data received!')
+//         // send back to other users inside game obj
+//         gameObj.users.forEach(user => {
+//             console.log('sending message to ' + user.username)
+//             waitingRooms.emitMessage(ws, user.username, gameObj)
+//         })
+//     })
 
-//         if (dataObj.type === 'message') {
-//             wss.clients.forEach(client => {
-//                 if (client !== ws && client.readyState === WebSocket.OPEN) {
-//                     client.send(JSON.stringify(data))
-//                     console.log('sending message back', data)
-//                 }
-//             })
-//         }
+//     ws.on('close', (code, reason) => {
+//         waitingRooms.removeConnection(ws, req.user)
 //     })
 // })
 
-const test = app.listen(SERVER_PORT, () => {
-    console.log('listening on port', test.address().port)
-})
-
+module.exports = app

@@ -1,6 +1,7 @@
 var app = require('express')()
 var http = require('http')
-var server = http.createServer(app).listen(4000)
+const PORT = process.env.port || 4000
+var server = http.createServer(app).listen(PORT)
 var io = require('socket.io').listen(server)
 var mongoose = require('mongoose')
 var bodyParser = require("body-parser")

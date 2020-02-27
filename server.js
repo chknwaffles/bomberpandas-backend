@@ -10,13 +10,14 @@ var cors = require('cors')
 var User = require('./models/User')
 var Game = require('./models/Game')
 var port = process.env.PORT || 4000
+var mongodbUrl = process.env.MONGOD_URI || `mongodb://localhost/bomberman`
 //express routes
 var UserRoutes = require('./routes/UserRoutes')
 var gameController = require('./controllers/GameController')
 var bombTimer
 
 var store = new MongoDBStore({
-    uri: process.env.MONGODB_URI,
+    uri: mongodbUrl,
     collection: 'mySessions',
     useUnifiedTopology: true
 })
@@ -39,7 +40,7 @@ app.use(session({
 }))
 
 //MongoDB connection through mongoose
-mongoose.connect(process.env.MONGODB_URI, { useNewUrlParser: true })
+mongoose.connect(mongodbUrl, { useNewUrlParser: true, useUnifiedTopology: true })
 .then(() => console.log('MongoDB connected!'))
 mongoose.set('useCreateIndex', true)
 
